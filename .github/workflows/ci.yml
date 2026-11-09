@@ -1,0 +1,58 @@
+name: CI – Build-Failure Prediction
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build-and-predict:
+    name: Train model and run predictions
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Python 3.12
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 3. Cache pip packages to speed up future runs
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # 4. Install Python dependencies
+      - name: Install dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      # 5. Generate synthetic dataset
+      - name: Generate dataset
+        run: python ml/generate_dataset.py
+
+      # 6. Train the Random Forest model
+      - name: Train model
+        run: python src/train_model.py
+
+      # 7. Run build-failure predictions
+      - name: Run predictions
+        run: python src/predict_failure.py
+
+      # 8. Upload results as workflow artifacts (optional – handy for review)
+      - name: Upload evaluation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-results
+          path: |
+            results/evaluation.txt
+            results/feature_importance.png
+          if-no-files-found: warn
